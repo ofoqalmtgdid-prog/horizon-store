@@ -1,0 +1,3 @@
+- [About page data format](about-data-format.md) — server stores `JSON.stringify(req.body)` in aboutPageTable; always use `loadAboutData()` + `saveAboutMerge()` helpers to read/write to avoid double-encoding.
+- [Store settings location](about-data-format.md) — storeName, storeSubtitle, heroImageUrl, primaryColor, logoUrl, faviconUrl, whatsapp1, whatsapp2 are merged into the same aboutPageTable JSON row alongside about-page fields.
+- [Category image upload](about-data-format.md) — categoriesTable has imageUrl column (migration ran); admin CRUD at /admin/categories; generated hooks: useAdminListCategories, useAdminCreateCategory, useAdminUpdateCategory, useAdminDeleteCategory.

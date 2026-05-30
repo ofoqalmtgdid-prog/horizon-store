@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "متجر الأفق المتجدد"
+version = "1.0.0"
+id = "artifacts/horizon-store"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25374
+
+[services.development]
+run = "pnpm --filter @workspace/horizon-store run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/horizon-store", "run", "build" ]
+publicDir = "artifacts/horizon-store/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25374"
+BASE_PATH = "/"

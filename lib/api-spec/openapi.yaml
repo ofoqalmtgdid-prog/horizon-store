@@ -1,0 +1,1398 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: متجر الأفق المتجدد API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication
+  - name: catalog
+    description: Categories, subcategories, products
+  - name: cart
+    description: Shopping cart
+  - name: favorites
+    description: Wishlist / favorites
+  - name: orders
+    description: Customer orders
+  - name: admin
+    description: Admin dashboard
+  - name: Storage
+    description: Object storage upload and serving endpoints.
+paths:
+  /storage/uploads/request-url:
+    post:
+      tags: [Storage]
+      operationId: requestUploadUrl
+      summary: Request a presigned URL for file upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UploadUrlRequest' }
+      responses:
+        '200':
+          description: Presigned upload URL generated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UploadUrlResponse' }
+  /storage/public-objects/{filePath}:
+    get:
+      tags: [Storage]
+      operationId: getPublicObject
+      summary: Serve a public asset
+      parameters:
+        - name: filePath
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Object content
+          content:
+            '*/*':
+              schema: { type: string, format: binary }
+  /storage/objects/{objectPath}:
+    get:
+      tags: [Storage]
+      operationId: getStorageObject
+      summary: Serve an object entity
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Object content
+          content:
+            '*/*':
+              schema: { type: string, format: binary }
+
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthStatus" }
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterBody" }
+      responses:
+        "200":
+          description: Registered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResponse" }
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with phone and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginBody" }
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResponse" }
+  /auth/me:
+    get:
+      operationId: me
+      tags: [auth]
+      summary: Current user
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OkResponse" }
+
+  /categories:
+    get:
+      operationId: listCategories
+      tags: [catalog]
+      summary: List all categories with subcategories
+      responses:
+        "200":
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CategoryWithSubs" }
+  /categories/{slug}:
+    get:
+      operationId: getCategory
+      tags: [catalog]
+      summary: Get a category by slug
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Category
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CategoryWithSubs" }
+
+  /subcategories/{slug}/products:
+    get:
+      operationId: listSubcategoryProducts
+      tags: [catalog]
+      summary: List products in a subcategory
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum: [price_asc, price_desc, newest]
+      responses:
+        "200":
+          description: Products
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [subcategory, products]
+                properties:
+                  subcategory: { $ref: "#/components/schemas/Subcategory" }
+                  category: { $ref: "#/components/schemas/Category" }
+                  products:
+                    type: array
+                    items: { $ref: "#/components/schemas/Product" }
+
+  /products/{id}:
+    get:
+      operationId: getProduct
+      tags: [catalog]
+      summary: Get a product by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Product
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+
+  /products/random-strip:
+    get:
+      operationId: getRandomStrip
+      tags: [catalog]
+      summary: Random products for the top scrolling strip
+      responses:
+        "200":
+          description: Random products
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Product" }
+
+  /products/featured-by-category:
+    get:
+      operationId: getFeaturedByCategory
+      tags: [catalog]
+      summary: Returns rotating featured products for each category (used for homepage 3-product rotators)
+      responses:
+        "200":
+          description: Featured products grouped by category
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CategoryFeatured" }
+
+  /cart:
+    get:
+      operationId: getCart
+      tags: [cart]
+      summary: Get current cart
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+      responses:
+        "200":
+          description: Cart
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Cart" }
+  /cart/items:
+    post:
+      operationId: addCartItem
+      tags: [cart]
+      summary: Add a product to the cart
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AddCartItemBody" }
+      responses:
+        "200":
+          description: Cart
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Cart" }
+  /cart/items/{productId}:
+    patch:
+      operationId: updateCartItem
+      tags: [cart]
+      summary: Update quantity of a cart item
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: productId
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateCartItemBody" }
+      responses:
+        "200":
+          description: Cart
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Cart" }
+    delete:
+      operationId: deleteCartItem
+      tags: [cart]
+      summary: Remove a product from the cart
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: productId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Cart
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Cart" }
+
+  /favorites:
+    get:
+      operationId: getFavorites
+      tags: [favorites]
+      summary: Get favorite products
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+      responses:
+        "200":
+          description: Favorites
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Product" }
+  /favorites/{productId}:
+    post:
+      operationId: addFavorite
+      tags: [favorites]
+      summary: Add a product to favorites
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: productId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OkResponse" }
+    delete:
+      operationId: removeFavorite
+      tags: [favorites]
+      summary: Remove a product from favorites
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: productId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OkResponse" }
+
+  /orders:
+    get:
+      operationId: listMyOrders
+      tags: [orders]
+      summary: List the current user's orders
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+      responses:
+        "200":
+          description: Orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Order" }
+    post:
+      operationId: placeOrder
+      tags: [orders]
+      summary: Place an order from the current cart
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlaceOrderBody" }
+      responses:
+        "200":
+          description: Order created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      tags: [orders]
+      summary: Get a specific order
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+  /orders/{id}/cancel:
+    post:
+      operationId: cancelOrder
+      tags: [orders]
+      summary: Cancel my order
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+  /orders/{id}/resolve-stockout:
+    post:
+      operationId: resolveStockout
+      tags: [orders]
+      summary: Customer decision after a stockout (continue without item or cancel order)
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResolveStockoutBody" }
+      responses:
+        "200":
+          description: Order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+
+  /admin/summary:
+    get:
+      operationId: adminSummary
+      tags: [admin]
+      summary: Dashboard summary
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminSummary" }
+  /admin/orders:
+    get:
+      operationId: adminListOrders
+      tags: [admin]
+      summary: List all orders
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: query
+          name: status
+          schema: { $ref: "#/components/schemas/OrderStatus" }
+      responses:
+        "200":
+          description: Orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Order" }
+  /admin/orders/{id}/status:
+    patch:
+      operationId: adminUpdateOrderStatus
+      tags: [admin]
+      summary: Update order status
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateOrderStatusBody" }
+      responses:
+        "200":
+          description: Order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+  /admin/orders/{id}/stockout:
+    post:
+      operationId: adminFlagStockout
+      tags: [admin]
+      summary: Flag an order item as out of stock
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FlagStockoutBody" }
+      responses:
+        "200":
+          description: Order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+  /admin/users:
+    get:
+      operationId: adminListUsers
+      tags: [admin]
+      summary: List users
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+      responses:
+        "200":
+          description: Users
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/User" }
+  /admin/users/{id}/role:
+    patch:
+      operationId: adminUpdateUserRole
+      tags: [admin]
+      summary: Promote or demote a user
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateUserRoleBody" }
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+  /admin/products:
+    get:
+      operationId: adminListProducts
+      tags: [admin]
+      summary: List all products
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+      responses:
+        "200":
+          description: Products
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Product" }
+    post:
+      operationId: adminCreateProduct
+      tags: [admin]
+      summary: Create a product
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateProductBody" }
+      responses:
+        "200":
+          description: Product
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+  /profile:
+    put:
+      operationId: updateProfile
+      tags: [auth]
+      summary: Update own profile
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateProfileBody" }
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+
+  /delivery-regions:
+    get:
+      operationId: listDeliveryRegions
+      tags: [catalog]
+      summary: List active delivery regions with prices
+      responses:
+        "200":
+          description: Regions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/DeliveryRegion" }
+  /admin/delivery-regions:
+    get:
+      operationId: adminListDeliveryRegions
+      tags: [admin]
+      summary: List all delivery regions
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+      responses:
+        "200":
+          description: Regions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/DeliveryRegion" }
+    post:
+      operationId: adminCreateDeliveryRegion
+      tags: [admin]
+      summary: Create a delivery region
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateDeliveryRegionBody" }
+      responses:
+        "200":
+          description: Region
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeliveryRegion" }
+  /admin/delivery-regions/{id}:
+    patch:
+      operationId: adminUpdateDeliveryRegion
+      tags: [admin]
+      summary: Update a delivery region
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateDeliveryRegionBody" }
+      responses:
+        "200":
+          description: Region
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeliveryRegion" }
+    delete:
+      operationId: adminDeleteDeliveryRegion
+      tags: [admin]
+      summary: Delete a delivery region
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OkResponse" }
+
+  /admin/categories:
+    get:
+      operationId: adminListCategories
+      tags: [admin]
+      summary: List all categories (admin)
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+      responses:
+        "200":
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Category" }
+    post:
+      operationId: adminCreateCategory
+      tags: [admin]
+      summary: Create a category
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminCreateCategoryBody" }
+      responses:
+        "200":
+          description: Category
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Category" }
+  /admin/categories/{id}:
+    put:
+      operationId: adminUpdateCategory
+      tags: [admin]
+      summary: Update a category
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminUpdateCategoryBody" }
+      responses:
+        "200":
+          description: Category
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Category" }
+    delete:
+      operationId: adminDeleteCategory
+      tags: [admin]
+      summary: Delete a category
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OkResponse" }
+
+  /products/{id}/colors:
+    get:
+      operationId: getProductColors
+      tags: [catalog]
+      summary: Get colors for a product
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Colors
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ProductColor" }
+  /admin/products/{productId}/colors:
+    get:
+      operationId: adminGetProductColors
+      tags: [admin]
+      summary: Get all colors for a product (admin)
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: productId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Colors
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ProductColor" }
+    post:
+      operationId: adminCreateProductColor
+      tags: [admin]
+      summary: Add a color variant to a product
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: productId
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateProductColorBody" }
+      responses:
+        "200":
+          description: Color
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductColor" }
+  /admin/product-colors/{colorId}:
+    patch:
+      operationId: adminUpdateProductColor
+      tags: [admin]
+      summary: Update a product color
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: colorId
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateProductColorBody" }
+      responses:
+        "200":
+          description: Color
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductColor" }
+    delete:
+      operationId: adminDeleteProductColor
+      tags: [admin]
+      summary: Delete a product color
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: colorId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OkResponse" }
+
+  /products/{id}/ratings:
+    get:
+      operationId: getProductRatings
+      tags: [catalog]
+      summary: Get rating summary for a product
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Rating summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductRatingSummary" }
+    post:
+      operationId: submitProductRating
+      tags: [catalog]
+      summary: Rate a product
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmitRatingBody" }
+      responses:
+        "200":
+          description: Rating summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductRatingSummary" }
+
+  /about:
+    get:
+      operationId: getAboutPage
+      tags: [catalog]
+      summary: Get about page content
+      responses:
+        "200":
+          description: About page content
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AboutPageContent" }
+  /admin/about:
+    put:
+      operationId: adminUpdateAboutPage
+      tags: [admin]
+      summary: Update about page content
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AboutPageContent" }
+      responses:
+        "200":
+          description: Updated content
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AboutPageContent" }
+
+  /admin/products/{id}:
+    patch:
+      operationId: adminUpdateProduct
+      tags: [admin]
+      summary: Update a product
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateProductBody" }
+      responses:
+        "200":
+          description: Product
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+    delete:
+      operationId: adminDeleteProduct
+      tags: [admin]
+      summary: Delete a product
+      parameters:
+        - $ref: "#/components/parameters/SessionToken"
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OkResponse" }
+
+components:
+  parameters:
+    SessionToken:
+      in: header
+      name: x-session-token
+      required: false
+      schema: { type: string }
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+    OkResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name: { type: string, minLength: 1 }
+        size: { type: integer, minimum: 1 }
+        contentType: { type: string, minLength: 1 }
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL: { type: string, format: uri }
+        objectPath: { type: string }
+        metadata: { $ref: '#/components/schemas/UploadUrlRequest' }
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+
+    Gender:
+      type: string
+      enum: [male, female]
+    UserRole:
+      type: string
+      enum: [customer, admin]
+
+    RegisterBody:
+      type: object
+      required: [fullName, phone, region, age, gender, password]
+      properties:
+        fullName: { type: string, description: "الاسم الرباعي" }
+        phone: { type: string, description: "رقم الهاتف (ليبيانا أو مدار)" }
+        region: { type: string, description: "المنطقة" }
+        age: { type: integer, minimum: 1, maximum: 120 }
+        gender: { $ref: "#/components/schemas/Gender" }
+        password: { type: string, minLength: 4 }
+    LoginBody:
+      type: object
+      required: [phone, password]
+      properties:
+        phone: { type: string }
+        password: { type: string }
+    AuthResponse:
+      type: object
+      required: [user, token]
+      properties:
+        user: { $ref: "#/components/schemas/User" }
+        token: { type: string }
+    User:
+      type: object
+      required: [id, fullName, phone, region, age, gender, role]
+      properties:
+        id: { type: integer }
+        fullName: { type: string }
+        phone: { type: string }
+        region: { type: string }
+        age: { type: integer }
+        gender: { $ref: "#/components/schemas/Gender" }
+        role: { $ref: "#/components/schemas/UserRole" }
+        avatarUrl: { type: string, nullable: true }
+        walletBalance: { type: number }
+        createdAt: { type: string }
+    UpdateProfileBody:
+      type: object
+      properties:
+        fullName: { type: string }
+        region: { type: string }
+        avatarUrl: { type: string }
+        password: { type: string, minLength: 4 }
+
+    Category:
+      type: object
+      required: [id, slug, name]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        name: { type: string }
+        nameEn: { type: string, nullable: true }
+        icon: { type: string, nullable: true }
+        imageUrl: { type: string, nullable: true }
+    Subcategory:
+      type: object
+      required: [id, slug, name, categoryId]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        name: { type: string }
+        nameEn: { type: string, nullable: true }
+        categoryId: { type: integer }
+    SubcategoryWithCount:
+      allOf:
+        - $ref: "#/components/schemas/Subcategory"
+        - type: object
+          properties:
+            productCount: { type: integer }
+    CategoryWithSubs:
+      allOf:
+        - $ref: "#/components/schemas/Category"
+        - type: object
+          required: [subcategories]
+          properties:
+            subcategories:
+              type: array
+              items: { $ref: "#/components/schemas/SubcategoryWithCount" }
+    ProductColor:
+      type: object
+      required: [id, productId, name, hexCode, stock, enabled, sortOrder]
+      properties:
+        id: { type: integer }
+        productId: { type: integer }
+        name: { type: string }
+        hexCode: { type: string }
+        stock: { type: integer }
+        enabled: { type: boolean }
+        sortOrder: { type: integer }
+    Product:
+      type: object
+      required: [id, name, price, description, imageUrl, stock, subcategoryId, subcategorySlug, subcategoryName, categorySlug, categoryName]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        price: { type: number }
+        description: { type: string }
+        imageUrl: { type: string }
+        image2: { type: string, nullable: true }
+        image3: { type: string, nullable: true }
+        colorsEnabled: { type: boolean }
+        stock: { type: integer }
+        subcategoryId: { type: integer }
+        subcategorySlug: { type: string }
+        subcategoryName: { type: string }
+        categorySlug: { type: string }
+        categoryName: { type: string }
+        createdAt: { type: string }
+        averageRating: { type: number, nullable: true }
+        ratingCount: { type: integer }
+        colors:
+          type: array
+          items: { $ref: "#/components/schemas/ProductColor" }
+    CategoryFeatured:
+      type: object
+      required: [category, products]
+      properties:
+        category: { $ref: "#/components/schemas/Category" }
+        products:
+          type: array
+          items: { $ref: "#/components/schemas/Product" }
+
+    AddCartItemBody:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId: { type: integer }
+        quantity: { type: integer, minimum: 1 }
+        selectedColor: { type: string }
+    UpdateCartItemBody:
+      type: object
+      required: [quantity]
+      properties:
+        quantity: { type: integer, minimum: 1 }
+    CartItem:
+      type: object
+      required: [productId, quantity, product]
+      properties:
+        productId: { type: integer }
+        quantity: { type: integer }
+        product: { $ref: "#/components/schemas/Product" }
+    Cart:
+      type: object
+      required: [items, total, count]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/CartItem" }
+        total: { type: number }
+        count: { type: integer }
+
+    OrderStatus:
+      type: string
+      description: "حالة الطلب"
+      enum: [pending, preparing, prepared, delivered_to_courier, cancelled, stockout, payment_received]
+    PlaceOrderBody:
+      type: object
+      required: [region, address, phone, backupPhone]
+      properties:
+        region: { type: string }
+        address: { type: string }
+        phone: { type: string }
+        backupPhone: { type: string }
+        notes: { type: string }
+        deliveryFee: { type: number }
+    DeliveryRegion:
+      type: object
+      required: [id, name, price, enabled, sortOrder]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        price: { type: number }
+        enabled: { type: boolean }
+        sortOrder: { type: integer }
+    CreateDeliveryRegionBody:
+      type: object
+      required: [name, price]
+      properties:
+        name: { type: string }
+        price: { type: number, minimum: 0 }
+        enabled: { type: boolean }
+        sortOrder: { type: integer }
+    UpdateDeliveryRegionBody:
+      type: object
+      properties:
+        name: { type: string }
+        price: { type: number, minimum: 0 }
+        enabled: { type: boolean }
+        sortOrder: { type: integer }
+    CreateProductColorBody:
+      type: object
+      required: [name, hexCode, stock]
+      properties:
+        name: { type: string }
+        hexCode: { type: string }
+        stock: { type: integer, minimum: 0 }
+        enabled: { type: boolean }
+        sortOrder: { type: integer }
+    UpdateProductColorBody:
+      type: object
+      properties:
+        name: { type: string }
+        hexCode: { type: string }
+        stock: { type: integer, minimum: 0 }
+        enabled: { type: boolean }
+        sortOrder: { type: integer }
+    ProductRating:
+      type: object
+      required: [id, productId, userId, stars, createdAt]
+      properties:
+        id: { type: integer }
+        productId: { type: integer }
+        userId: { type: integer }
+        stars: { type: integer, minimum: 1, maximum: 5 }
+        label: { type: string, nullable: true }
+        createdAt: { type: string }
+    ProductRatingSummary:
+      type: object
+      required: [averageRating, ratingCount]
+      properties:
+        averageRating: { type: number, nullable: true }
+        ratingCount: { type: integer }
+        userRating:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/ProductRating"
+    SubmitRatingBody:
+      type: object
+      required: [stars]
+      properties:
+        stars: { type: integer, minimum: 1, maximum: 5 }
+        label: { type: string }
+    AboutPageContent:
+      type: object
+      properties:
+        managerName: { type: string }
+        managerTitle: { type: string }
+        managerBio: { type: string }
+        managerAvatarUrl: { type: string }
+        companyDescription: { type: string }
+        facebookUrl: { type: string }
+        instagramUrl: { type: string }
+        tiktokUrl: { type: string }
+        branches:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              location: { type: string }
+              description: { type: string }
+              imageUrl: { type: string }
+              managerName: { type: string }
+              managerTitle: { type: string }
+    OrderItem:
+      type: object
+      required: [id, productId, productName, productImage, price, quantity, outOfStock]
+      properties:
+        id: { type: integer }
+        productId: { type: integer }
+        productName: { type: string }
+        productImage: { type: string }
+        price: { type: number }
+        quantity: { type: integer }
+        outOfStock: { type: boolean }
+        selectedColor: { type: string, nullable: true }
+    Order:
+      type: object
+      required: [id, userId, status, total, region, address, phone, backupPhone, items, createdAt]
+      properties:
+        id: { type: integer }
+        userId: { type: integer }
+        userName: { type: string }
+        status: { $ref: "#/components/schemas/OrderStatus" }
+        total: { type: number }
+        deliveryFee: { type: number }
+        region: { type: string }
+        address: { type: string }
+        phone: { type: string }
+        backupPhone: { type: string }
+        notes: { type: string, nullable: true }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/OrderItem" }
+        createdAt: { type: string }
+    UpdateOrderStatusBody:
+      type: object
+      required: [status]
+      properties:
+        status: { $ref: "#/components/schemas/OrderStatus" }
+    FlagStockoutBody:
+      type: object
+      required: [orderItemId]
+      properties:
+        orderItemId: { type: integer }
+    ResolveStockoutBody:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [continue_without, cancel]
+
+    AdminSummary:
+      type: object
+      required: [totalOrders, pendingOrders, preparingOrders, totalRevenue, totalUsers, totalProducts, lowStockProducts, recentOrders]
+      properties:
+        totalOrders: { type: integer }
+        pendingOrders: { type: integer }
+        preparingOrders: { type: integer }
+        totalRevenue: { type: number }
+        totalUsers: { type: integer }
+        totalProducts: { type: integer }
+        lowStockProducts: { type: integer }
+        recentOrders:
+          type: array
+          items: { $ref: "#/components/schemas/Order" }
+
+    UpdateUserRoleBody:
+      type: object
+      required: [role]
+      properties:
+        role: { $ref: "#/components/schemas/UserRole" }
+
+    CreateProductBody:
+      type: object
+      required: [name, price, description, imageUrl, stock, subcategoryId]
+      properties:
+        name: { type: string }
+        price: { type: number }
+        description: { type: string }
+        imageUrl: { type: string }
+        image2: { type: string }
+        image3: { type: string }
+        stock: { type: integer }
+        subcategoryId: { type: integer }
+        colorsEnabled: { type: boolean }
+    UpdateProductBody:
+      type: object
+      properties:
+        name: { type: string }
+        price: { type: number }
+        description: { type: string }
+        imageUrl: { type: string }
+        image2: { type: string }
+        image3: { type: string }
+        stock: { type: integer }
+        subcategoryId: { type: integer }
+        colorsEnabled: { type: boolean }
+
+    AdminCreateCategoryBody:
+      type: object
+      required: [name, slug]
+      properties:
+        name: { type: string }
+        slug: { type: string }
+        nameEn: { type: string }
+        icon: { type: string }
+        imageUrl: { type: string }
+        sortOrder: { type: integer }
+    AdminUpdateCategoryBody:
+      type: object
+      properties:
+        name: { type: string }
+        slug: { type: string }
+        nameEn: { type: string }
+        icon: { type: string }
+        imageUrl: { type: string }
+        sortOrder: { type: integer }
