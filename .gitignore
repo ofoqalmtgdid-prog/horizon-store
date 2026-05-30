@@ -48,3 +48,4 @@ Thumbs.db
 .cache/
 .local/
 attached_assets/client_secret_*.json
+attached_assets/client_secret_*.json
